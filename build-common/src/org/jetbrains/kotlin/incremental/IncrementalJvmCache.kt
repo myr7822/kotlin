@@ -74,6 +74,7 @@ open class IncrementalJvmCache(
     protected open fun debugLog(message: String) {}
 
     override fun markDirty(removedAndCompiledSources: List<File>) {
+        debugLog("Mark dirty:\n${removedAndCompiledSources.joinToString("\n")}")
         for (sourceFile in removedAndCompiledSources) {
             val classes = sourceToClassesMap[sourceFile]
             classes.forEach {
