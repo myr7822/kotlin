@@ -54,8 +54,8 @@ class K2MetadataCompiler : CLICompiler<K2MetadataCompilerArguments>() {
     ): ExitCode {
         val collector = configuration.getNotNull(CLIConfigurationKeys.MESSAGE_COLLECTOR_KEY)
 
-        val plugLoadResult = PluginCliParser.loadPluginsSafe(arguments, configuration)
-        if (plugLoadResult != ExitCode.OK) return plugLoadResult
+        val pluginLoadResult = PluginCliParser.loadPluginsSafe(arguments, configuration)
+        if (pluginLoadResult != ExitCode.OK) return pluginLoadResult
 
         for (arg in arguments.freeArgs) {
             configuration.addKotlinSourceRoot(arg)
