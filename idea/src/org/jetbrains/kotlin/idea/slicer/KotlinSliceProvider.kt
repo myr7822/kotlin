@@ -16,15 +16,24 @@
 
 package org.jetbrains.kotlin.idea.slicer
 
+import com.intellij.codeInspection.dataFlow.Nullness
 import com.intellij.ide.util.treeView.AbstractTreeStructure
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.psi.PsiElement
 import com.intellij.slicer.*
+import org.jetbrains.kotlin.builtins.KotlinBuiltIns
+import org.jetbrains.kotlin.descriptors.CallableDescriptor
+import org.jetbrains.kotlin.idea.caches.resolve.analyze
+import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.references.KtReference
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.isPlainWithEscapes
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
+import org.jetbrains.kotlin.resolve.calls.callUtil.getType
+import org.jetbrains.kotlin.types.TypeUtils
+import org.jetbrains.kotlin.types.isError
+import org.jetbrains.kotlin.types.isNullabilityFlexible
 
 class KotlinSliceProvider : SliceLanguageSupportProvider {
     companion object {
@@ -33,7 +42,28 @@ class KotlinSliceProvider : SliceLanguageSupportProvider {
         }
     }
 
+    class KotlinGroupByNullnessAction(treeBuilder: SliceTreeBuilder) : GroupByNullnessActionBase(treeBuilder) {
+        override fun isAvailable() = true
+    }
+
     val leafAnalyzer by lazy { SliceLeafAnalyzer(LEAF_ELEMENT_EQUALITY, this) }
+    val nullnessAnalyzer: SliceNullnessAnalyzerBase by lazy {
+        object : SliceNullnessAnalyzerBase(LEAF_ELEMENT_EQUALITY, this) {
+            override fun checkNullness(element: PsiElement?): Nullness {
+                val type = when (element) {
+                    is KtCallableDeclaration -> (element.resolveToDescriptorIfAny() as? CallableDescriptor)?.returnType
+                    is KtDeclaration -> null
+                    is KtExpression -> element.getType(element.analyze())
+                    else -> null
+                } ?: return Nullness.UNKNOWN
+                return when {
+                    KotlinBuiltIns.isNullableNothing(type) -> Nullness.NULLABLE
+                    type.isError || TypeUtils.isNullableType(type) || type.isNullabilityFlexible() -> Nullness.UNKNOWN
+                    else -> Nullness.NOT_NULL
+                }
+            }
+        }
+    }
 
     override fun createRootUsage(element: PsiElement, params: SliceAnalysisParams) = KotlinSliceUsage(element, params)
 
@@ -67,12 +97,13 @@ class KotlinSliceProvider : SliceLanguageSupportProvider {
     }
 
     override fun startAnalyzeNullness(structure: AbstractTreeStructure, finalRunnable: Runnable) {
-
+        nullnessAnalyzer.startAnalyzeNullness(structure, finalRunnable)
     }
 
     override fun registerExtraPanelActions(group: DefaultActionGroup, builder: SliceTreeBuilder) {
         if (builder.dataFlowToThis) {
             group.add(GroupByLeavesAction(builder))
+            group.add(KotlinGroupByNullnessAction(builder))
         }
     }
 }
