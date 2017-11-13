@@ -93,7 +93,7 @@ val packCompiler by task<ShadowJar> {
     setupPublicJar("before-proguard")
     from(fatJarContents)
     ideaSdkDeps("jps-model.jar", subdir = "jps").forEach { from(zipTree(it)) { exclude("META-INF/services/**") } }
-    ideaSdkDeps("oromatcher").forEach { from(zipTree(it)) { exclude("META-INF/jb/** META-INF/LICENSE") } }
+//    ideaSdkDeps("oromatcher").forEach { from(zipTree(it)) { exclude("META-INF/jb/** META-INF/LICENSE") } }
     ideaSdkCoreDeps("jdom", "log4j").forEach { from(zipTree(it)) { exclude("META-INF/jb/** META-INF/LICENSE") } }
 
     manifest.attributes.put("Class-Path", compilerManifestClassPath)
