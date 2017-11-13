@@ -17,6 +17,7 @@
 package org.jetbrains.kotlin.kapt3
 
 import com.sun.tools.javac.comp.CompileStates
+import com.sun.tools.javac.comp.CompileStates.*
 import com.sun.tools.javac.file.JavacFileManager
 import com.sun.tools.javac.main.JavaCompiler
 import com.sun.tools.javac.main.Option
@@ -72,27 +73,16 @@ fun KaptContext<*>.doAnnotationProcessing(
             compiler.initProcessAnnotations(processors)
         }
 
-        val javaFileObjects = fileManager.getJavaFileObjectsFromFiles(javaSourceFiles)
-        var parsedJavaFiles = compiler.stopIfErrorOccurred(
-                CompileStates.CompileState.PARSE, compiler.parseFiles(javaFileObjects))
+        val parsedJavaFiles = parseJavaFiles(javaSourceFiles)
 
-        if (isJava9OrLater) {
-            val initModulesMethod = compiler.javaClass.getMethod("initModules", JavacList::class.java)
-
-            @Suppress("UNCHECKED_CAST")
-            parsedJavaFiles = compiler.stopIfErrorOccurred(
-                    CompileStates.CompileState.PARSE,
-                    initModulesMethod.invoke(compiler, parsedJavaFiles) as JavacList<JCTree.JCCompilationUnit>)
-        }
-
-        if (compiler.shouldStop(CompileStates.CompileState.PARSE)) {
+        if (compiler.shouldStop(CompileState.PARSE)) {
             throw KaptError(KaptError.Kind.ERROR_RAISED)
         }
 
         compilerAfterAP = try {
             javaLog.interceptorData.files = parsedJavaFiles.map { it.sourceFile to it }.toMap()
             val analyzedFiles = compiler.stopIfErrorOccurred(
-                    CompileStates.CompileState.PARSE, compiler.enterTrees(parsedJavaFiles + additionalSources))
+                    CompileState.PARSE, compiler.enterTrees(parsedJavaFiles + additionalSources))
 
             if (isJava9OrLater) {
                 val processAnnotationsMethod = compiler.javaClass.getMethod("processAnnotations", JavacList::class.java)
@@ -124,4 +114,26 @@ fun KaptContext<*>.doAnnotationProcessing(
         processingEnvironment.close()
         this@doAnnotationProcessing.close()
     }
+}
+
+internal fun KaptContext<*>.parseJavaFiles(javaSourceFiles: List<File>): JavacList<JCTree.JCCompilationUnit> {
+    val javaFileObjects = fileManager.getJavaFileObjectsFromFiles(javaSourceFiles)
+
+    return compiler.stopIfErrorOccurred(CompileState.PARSE,
+                    initModulesIfNeeded(
+                            compiler.stopIfErrorOccurred(CompileState.PARSE,
+                                    compiler.parseFiles(javaFileObjects))))
+}
+
+private fun KaptContext<*>.initModulesIfNeeded(files: JavacList<JCTree.JCCompilationUnit>): JavacList<JCTree.JCCompilationUnit> {
+    if (isJava9OrLater) {
+        val initModulesMethod = compiler.javaClass.getMethod("initModules", JavacList::class.java)
+
+        @Suppress("UNCHECKED_CAST")
+        return compiler.stopIfErrorOccurred(
+                CompileState.PARSE,
+                initModulesMethod.invoke(compiler, files) as JavacList<JCTree.JCCompilationUnit>)
+    }
+
+    return files
 }
