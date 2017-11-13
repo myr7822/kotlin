@@ -1,4 +1,8 @@
+import org.gradle.plugins.ide.idea.model.IdeaModel
 
+plugins {
+    idea
+}
 apply { plugin("kotlin") }
 
 jvmTarget = "1.6"
@@ -20,4 +24,12 @@ sourceSets {
         java.srcDir("../js.inliner/src")
     }
     "test" {}
+}
+
+configure<IdeaModel> {
+    module {
+        excludeDirs = excludeDirs + files(
+                "testData/out"
+        )
+    }
 }
