@@ -38,7 +38,6 @@ class CoroutineBodyTransformer(private val context: CoroutineTransformationConte
     private lateinit var nodesToSplit: Set<JsNode>
     private var currentCatchBlock = globalCatchBlock
     private val tryStack = mutableListOf(TryBlock(globalCatchBlock, null))
-    private var switchDepth = 0
 
     var hasFinallyBlocks = false
         get
@@ -93,7 +92,6 @@ class CoroutineBodyTransformer(private val context: CoroutineTransformationConte
         val switchBlock = currentBlock
         val jointBlock = CoroutineBlock()
 
-        switchDepth++
         withBreakAndContinue(x, jointBlock, null) {
             for (jsCase in x.cases) {
                 val caseBlock = CoroutineBlock()
@@ -106,7 +104,6 @@ class CoroutineBodyTransformer(private val context: CoroutineTransformationConte
                 jsCase.statements += caseBlock.statements
             }
         }
-        switchDepth--
         switchBlock.statements += x
 
         currentBlock = jointBlock
