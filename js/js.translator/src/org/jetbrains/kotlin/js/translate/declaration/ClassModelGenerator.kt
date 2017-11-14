@@ -182,8 +182,16 @@ class ClassModelGenerator(val context: TranslationContext) {
         // If found member is not from interface, we don't need to copy it, it's already in prototype
         if ((memberToCopy.containingDeclaration as ClassDescriptor).kind != ClassKind.INTERFACE) return null
 
-        // If found member is fake itself, repeat search for it, until we find actual implementation
-        return if (!memberToCopy.kind.isReal) findOptionalArgsMemberToCopy(memberToCopy) else memberToCopy
+        // If found member has default arguments, it's a top-level method to copy
+        if (memberToCopy.hasOwnParametersWithDefaultValue()) return memberToCopy
+
+        // If found member is fake or abstract itself, repeat search for it, until we find actual implementation
+        return if (!memberToCopy.kind.isReal || memberToCopy.modality == Modality.ABSTRACT) {
+            findOptionalArgsMemberToCopy(memberToCopy)
+        }
+        else {
+            memberToCopy
+        }
     }
 
     private fun <T : CallableMemberDescriptor> T.findNonRepeatingOverriddenDescriptors(
